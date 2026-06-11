@@ -13,7 +13,7 @@ def remove_accents(text):
         if unicodedata.category(c) != 'Mn'
     )
 
-def extraer_contexto(texto, palabra, window=60):
+def extraer_contexto(texto, palabra, window=100):
     texto_norm = remove_accents(texto)
     palabra_norm = remove_accents(palabra)
     pattern = re.compile(rf"(.{{0,{window}}}{re.escape(palabra_norm)}.{{0,{window}}})", re.IGNORECASE)
