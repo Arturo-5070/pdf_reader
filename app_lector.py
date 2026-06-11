@@ -31,7 +31,7 @@ def highlight_extra(text, word):
     text_norm = remove_accents(text)
 
     style = (
-        "background: linear-gradient(90deg, #fff3a3 0%, #ffe680 100%); "
+        "background: linear-gradient(90deg, #807c6b 0%, #5e5011 100%); "
         "padding: 2px 4px; "
         "border-radius: 4px; "
         "font-weight: 600;"
@@ -64,8 +64,8 @@ collection = db["pages"]
 st.title("Lector-buscador de leyes en español")
 
 book_options = {
-    "Ley Fintech MX": "fintech_MX",
-    "Disposiciones Generales de Crédito MX": "DispoGenCred_MX",
+    "Disposiciones de carácter general aplicables a las instituciones de crédito (2026)": "DispoGenCred_MX",
+    "Ley para Regular las Instituciones de Tecnología Financiera (2018)": "fintech_MX",
     "Ambos documentos": None
 }
 
@@ -93,7 +93,7 @@ if query:
             highlighted = highlight_extra(contexto, query)
 
             st.markdown(
-                f"<h4>📄 {r['book_id']} — Página {r['page']}</h4>",
+                f"<h7>📄 {r['book_id']} — Página {r['page']}</h7>",
                 unsafe_allow_html=True
             )
             st.markdown(highlighted, unsafe_allow_html=True)
