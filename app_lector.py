@@ -47,20 +47,41 @@ def highlight_extra(text, word):
     return "".join(result)
 
 # ─────────────────────────────────────────
-# MONGODB CONNECTION
+# CACHED MONGODB CONNECTION
 # ─────────────────────────────────────────
-uri = st.secrets["mongo"]["connection_string"]
-client = MongoClient(uri)
-db = client["ley_fintech_db"]
-collection = db["pages"]
+@st.cache_resource
+def get_collection():
+    uri = st.secrets["mongo"]["connection_string"]
+    client = MongoClient(uri)
+    db = client["ley_fintech_db"]
+    return db["pages"]
 
 # ─────────────────────────────────────────
-# SESSION STATE
+# CACHED QUERIES
+# ─────────────────────────────────────────
+@st.cache_data(ttl=300)
+def search_pages(query, selected_book_id):
+    collection = get_collection()
+    text_filter = {"$text": {"$search": query}}
+    if selected_book_id is not None:
+        text_filter["book_id"] = selected_book_id
+    return list(collection.find(text_filter, {"text": 1, "page": 1, "book_id": 1, "_id": 0}).sort("page", 1))
+
+@st.cache_data(ttl=600)
+def get_full_page(book_id, page):
+    collection = get_collection()
+    doc = collection.find_one({"book_id": book_id, "page": page}, {"text": 1, "_id": 0})
+    return doc["text"] if doc else None
+
+# ─────────────────────────────────────────
+# SESSION STATE INITIALIZATION
 # ─────────────────────────────────────────
 if "selected_page" not in st.session_state:
     st.session_state.selected_page = None
 if "selected_book_id" not in st.session_state:
     st.session_state.selected_book_id = None
+if "last_query" not in st.session_state:
+    st.session_state.last_query = ""
 
 # ─────────────────────────────────────────
 # FULL PAGE VIEW
@@ -69,23 +90,22 @@ if st.session_state.selected_page is not None:
     book = st.session_state.selected_book_id
     page = st.session_state.selected_page
 
-    doc = collection.find_one({"book_id": book, "page": page}, {"text": 1, "_id": 0})
-
     st.markdown(f"### 📄 {book} — Página {page}")
 
-    if doc:
-        full_text = highlight_extra(doc["text"], st.session_state.get("last_query", ""))
+    full_text = get_full_page(book, page)
+
+    if full_text:
+        highlighted = highlight_extra(full_text, st.session_state.last_query)
         st.markdown(
             f"""
             <div style="
-                background-color: #1e1e1e;
                 border: 1px solid #444;
                 border-radius: 8px;
                 padding: 20px;
                 font-size: 15px;
                 line-height: 1.8;
                 text-align: justify;
-            ">{full_text}</div>
+            ">{highlighted}</div>
             """,
             unsafe_allow_html=True
         )
@@ -102,7 +122,7 @@ if st.session_state.selected_page is not None:
 # SEARCH VIEW
 # ─────────────────────────────────────────
 else:
-    st.title("Buscador de palabras en disposiciones de la Comision Nacional Bancaria y de Valores")
+    st.title("Buscador de palabras en publicaciones de la Comision Nacional Bancaria y de Valores")
 
     book_options = {
         "Disposiciones de carácter general aplicables a las instituciones de crédito (2026)": "DispoGenCred_MX",
@@ -118,11 +138,7 @@ else:
     if query:
         st.session_state.last_query = query
 
-        text_filter = {"$text": {"$search": query}}
-        if selected_book_id is not None:
-            text_filter["book_id"] = selected_book_id
-
-        results = list(collection.find(text_filter).sort("page", 1))
+        results = search_pages(query, selected_book_id)
 
         if not results:
             st.warning("No se encontraron resultados para tu búsqueda.")
