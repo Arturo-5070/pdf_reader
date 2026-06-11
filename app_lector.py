@@ -13,7 +13,7 @@ def extraer_contexto(texto, palabra, window=90):
 def highlight_extra(text, word):
     pattern = re.compile(rf"({re.escape(word)})", re.IGNORECASE)
     style = (
-        "background: linear-gradient(90deg, #fff3a3 0%, #ffe680 100%); "
+        "background: linear-gradient(90deg, #574e30 0%, ##949073 100%); "
         "padding: 2px 4px; "
         "border-radius: 4px; "
         "font-weight: 600;"
@@ -32,7 +32,7 @@ collection = db["pages"]
 # ─────────────────────────────────────────
 # UI
 # ─────────────────────────────────────────
-st.title("Lector-buscador de palabras en las disposiciones publicadas por la Comision Nacional bancaria y de valores")
+st.title("Buscador de palabras en las disposiciones publicadas por la Comision Nacional Bancaria y de Valores")
 
 # Book selector
 book_options = {
