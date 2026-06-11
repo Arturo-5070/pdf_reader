@@ -24,7 +24,7 @@ def highlight_extra(text, word):
 # MONGODB CONNECTION
 # ─────────────────────────────────────────
 
-uri = st.secrets["mongo_uri"] if "mongo_uri" in st.secrets
+uri = st.secrets["mongo"]["connection_string"]
 client = MongoClient(uri)
 db = client["ley_fintech_db"]
 collection = db["pages"]
