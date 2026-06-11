@@ -1,4 +1,3 @@
-%%writefile app_lector.py
 import streamlit as st
 from pymongo import MongoClient
 import re
