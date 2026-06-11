@@ -36,8 +36,8 @@ st.title("Buscador de palabras en las disposiciones publicadas por la Comision N
 
 # Book selector
 book_options = {
-    "Ley Fintech MX": "fintech_MX",
-    "Disposiciones Generales de Crédito MX": "DispoGenCred_MX",
+    "Ley para Regular las Instituciones de Tecnología Financiera (2018)": "fintech_MX",
+    "Disposiciones de carácter general aplicables a las instituciones de crédito (2026)": "DispoGenCred_MX",
     "Ambos documentos": None
 }
 
@@ -65,7 +65,7 @@ if query:
             highlighted = highlight_extra(contexto, query)
 
             st.markdown(
-                f"<h4>📄 {r['book_id']} — Página {r['page']}</h4>",
+                f"<h2>📄 {r['book_id']} — Página {r['page']}</h2>",
                 unsafe_allow_html=True
             )
             st.markdown(highlighted, unsafe_allow_html=True)
