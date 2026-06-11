@@ -5,7 +5,7 @@ import re
 # ─────────────────────────────────────────
 # HELPER FUNCTIONS
 # ─────────────────────────────────────────
-def extraer_contexto(texto, palabra, window=60):
+def extraer_contexto(texto, palabra, window=90):
     pattern = re.compile(rf"(.{{0,{window}}}{re.escape(palabra)}.{{0,{window}}})", re.IGNORECASE)
     match = pattern.search(texto)
     return match.group(1) if match else texto[:2 * window]
@@ -32,7 +32,7 @@ collection = db["pages"]
 # ─────────────────────────────────────────
 # UI
 # ─────────────────────────────────────────
-st.title("Lector-buscador de leyes en español")
+st.title("Lector-buscador de palabras en las disposiciones publicadas por la Comision Nacional bancaria y de valores")
 
 # Book selector
 book_options = {
