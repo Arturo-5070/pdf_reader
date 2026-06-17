@@ -147,6 +147,18 @@ def get_page_bounds(book_id):
     max_page = last_doc["page"] if last_doc else None
     return (min_page, max_page)
 
+@st.cache_data(ttl=600)
+def find_page_across_books(page_number):
+    """
+    Look up a page number across BOTH books (since the page search doesn't
+    restrict to the currently selected document). Returns a list of
+    book_ids that have a page with this number (usually 0 or 1, but could
+    be 2 if both books happen to share that page number).
+    """
+    collection = get_collection()
+    docs = list(collection.find({"page": page_number}, {"book_id": 1, "_id": 0}))
+    return [d["book_id"] for d in docs]
+
 # ─────────────────────────────────────────
 # SESSION STATE INITIALIZATION
 # ─────────────────────────────────────────
@@ -218,7 +230,7 @@ if st.session_state.selected_page is not None:
 # SEARCH VIEW
 # ─────────────────────────────────────────
 else:
-    st.title("Lector-buscador de leyes en español")
+    st.title("Buscador de palabras en publicaciones de la Comision Nacional Bancaria y de Valores")
 
     book_options = {
         "Disposiciones de carácter general aplicables a las instituciones de crédito (2026)": "DispoGenCred_MX",
@@ -228,6 +240,50 @@ else:
 
     selected_label = st.selectbox("Selecciona el documento", options=list(book_options.keys()))
     selected_book_id = book_options[selected_label]
+
+    # ── Buscador por número de página ──
+    page_col1, page_col2 = st.columns([3, 1])
+    with page_col1:
+        page_input = st.number_input(
+            "Ir directamente a una página",
+            min_value=1,
+            step=1,
+            value=None,
+            placeholder="Número de página",
+            format="%d"
+        )
+    with page_col2:
+        st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+        go_to_page_clicked = st.button("Ir a página", use_container_width=True)
+
+    if go_to_page_clicked:
+        if page_input is None:
+            st.warning("Escribe un número de página primero.")
+        else:
+            page_number = int(page_input)
+            matching_books = find_page_across_books(page_number)
+
+            if not matching_books:
+                st.error(f"La página {page_number} no existe en ningún documento.")
+            elif len(matching_books) == 1:
+                st.session_state.selected_page = page_number
+                st.session_state.selected_book_id = matching_books[0]
+                st.session_state.last_query = ""
+                st.rerun()
+            else:
+                # Page number exists in more than one book — ask which one
+                st.info(
+                    f"La página {page_number} existe en más de un documento: "
+                    f"{', '.join(matching_books)}. Selecciona uno:"
+                )
+                for b in matching_books:
+                    if st.button(f"Ver página {page_number} de {b}", key=f"goto_{b}_{page_number}"):
+                        st.session_state.selected_page = page_number
+                        st.session_state.selected_book_id = b
+                        st.session_state.last_query = ""
+                        st.rerun()
+
+    st.markdown("<hr>", unsafe_allow_html=True)
 
     query = st.text_input("Palabra o frase a buscar")
 
