@@ -24,6 +24,9 @@ def extraer_contexto(texto, palabra, window=100):
     return texto[:2 * window]
 
 def highlight_extra(text, word):
+    if not word:
+        return text
+
     word_norm = remove_accents(word)
     pattern = re.compile(rf"({re.escape(word_norm)})", re.IGNORECASE)
     text_norm = remove_accents(text)
@@ -46,6 +49,61 @@ def highlight_extra(text, word):
 
     return "".join(result)
 
+def format_breadcrumb(bc):
+    """
+    Build a single human-readable breadcrumb string from a structure dict,
+    e.g. 'TÍTULO QUINTO > Capítulo XIV Bis > Sección Tercera'.
+    Skips empty levels (Apartado/Subapartado are often blank).
+    """
+    if not bc:
+        return ""
+
+    parts = []
+    if bc.get("titulo"):
+        label = bc["titulo"]
+        if bc.get("nombre_titulo"):
+            label += f" ({bc['nombre_titulo']})"
+        parts.append(label)
+    if bc.get("capitulo"):
+        label = bc["capitulo"]
+        if bc.get("nombre_capitulo"):
+            label += f" ({bc['nombre_capitulo']})"
+        parts.append(label)
+    if bc.get("seccion"):
+        label = bc["seccion"]
+        if bc.get("nombre_seccion"):
+            label += f" ({bc['nombre_seccion']})"
+        parts.append(label)
+    if bc.get("apartado"):
+        label = bc["apartado"]
+        if bc.get("nombre_apartado"):
+            label += f" ({bc['nombre_apartado']})"
+        parts.append(label)
+    if bc.get("subapartado"):
+        label = bc["subapartado"]
+        if bc.get("nombre_subapartado"):
+            label += f" ({bc['nombre_subapartado']})"
+        parts.append(label)
+
+    return " &gt; ".join(parts)
+
+def render_breadcrumbs(structure_list):
+    """
+    Render one or more breadcrumb trails for a page. A page can have
+    multiple entries if more than one Seccion/Capitulo starts on it.
+    """
+    if not structure_list:
+        return ""
+
+    html_parts = []
+    for bc in structure_list:
+        crumb = format_breadcrumb(bc)
+        if crumb:
+            html_parts.append(
+                f'<div style="font-size: 13px; opacity: 0.75; margin-bottom: 2px;">📍 {crumb}</div>'
+            )
+    return "".join(html_parts)
+
 # ─────────────────────────────────────────
 # CACHED MONGODB CONNECTION
 # ─────────────────────────────────────────
@@ -65,13 +123,29 @@ def search_pages(query, selected_book_id):
     text_filter = {"$text": {"$search": query}}
     if selected_book_id is not None:
         text_filter["book_id"] = selected_book_id
-    return list(collection.find(text_filter, {"text": 1, "page": 1, "book_id": 1, "_id": 0}).sort("page", 1))
+    return list(collection.find(
+        text_filter,
+        {"text": 1, "page": 1, "book_id": 1, "structure": 1, "_id": 0}
+    ).sort("page", 1))
 
 @st.cache_data(ttl=600)
 def get_full_page(book_id, page):
     collection = get_collection()
-    doc = collection.find_one({"book_id": book_id, "page": page}, {"text": 1, "_id": 0})
-    return doc["text"] if doc else None
+    doc = collection.find_one(
+        {"book_id": book_id, "page": page},
+        {"text": 1, "structure": 1, "_id": 0}
+    )
+    return doc
+
+@st.cache_data(ttl=600)
+def get_page_bounds(book_id):
+    """Return (min_page, max_page) for a given book_id, used for nav button limits."""
+    collection = get_collection()
+    first_doc = collection.find_one({"book_id": book_id}, {"page": 1}, sort=[("page", 1)])
+    last_doc = collection.find_one({"book_id": book_id}, {"page": 1}, sort=[("page", -1)])
+    min_page = first_doc["page"] if first_doc else None
+    max_page = last_doc["page"] if last_doc else None
+    return (min_page, max_page)
 
 # ─────────────────────────────────────────
 # SESSION STATE INITIALIZATION
@@ -90,11 +164,17 @@ if st.session_state.selected_page is not None:
     book = st.session_state.selected_book_id
     page = st.session_state.selected_page
 
+    doc = get_full_page(book, page)
+    min_page, max_page = get_page_bounds(book)
+
     st.markdown(f"### 📄 {book} — Página {page}")
 
-    full_text = get_full_page(book, page)
+    if doc:
+        breadcrumb_html = render_breadcrumbs(doc.get("structure"))
+        if breadcrumb_html:
+            st.markdown(breadcrumb_html, unsafe_allow_html=True)
 
-    if full_text:
+        full_text = doc.get("text", "")
         highlighted = highlight_extra(full_text, st.session_state.last_query)
         st.markdown(
             f"""
@@ -113,16 +193,32 @@ if st.session_state.selected_page is not None:
         st.error("No se pudo cargar el texto de esta página.")
 
     st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("← Volver a los resultados"):
-        st.session_state.selected_page = None
-        st.session_state.selected_book_id = None
-        st.rerun()
+
+    nav_col1, nav_col2, nav_col3 = st.columns([1, 1, 2])
+
+    with nav_col1:
+        prev_disabled = (min_page is not None and page <= min_page)
+        if st.button("← Página anterior", disabled=prev_disabled, use_container_width=True):
+            st.session_state.selected_page = page - 1
+            st.rerun()
+
+    with nav_col2:
+        next_disabled = (max_page is not None and page >= max_page)
+        if st.button("Página siguiente →", disabled=next_disabled, use_container_width=True):
+            st.session_state.selected_page = page + 1
+            st.rerun()
+
+    with nav_col3:
+        if st.button("← Volver a los resultados"):
+            st.session_state.selected_page = None
+            st.session_state.selected_book_id = None
+            st.rerun()
 
 # ─────────────────────────────────────────
 # SEARCH VIEW
 # ─────────────────────────────────────────
 else:
-    st.title("Buscador de palabras en publicaciones de la Comision Nacional Bancaria y de Valores")
+    st.title("Lector-buscador de leyes en español")
 
     book_options = {
         "Disposiciones de carácter general aplicables a las instituciones de crédito (2026)": "DispoGenCred_MX",
@@ -156,6 +252,9 @@ else:
                         f"<b>📄 {r['book_id']} — Página {r['page']}</b>",
                         unsafe_allow_html=True
                     )
+                    breadcrumb_html = render_breadcrumbs(r.get("structure"))
+                    if breadcrumb_html:
+                        st.markdown(breadcrumb_html, unsafe_allow_html=True)
                     st.markdown(highlighted, unsafe_allow_html=True)
 
                 with col2:
