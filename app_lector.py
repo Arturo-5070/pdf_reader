@@ -241,6 +241,45 @@ else:
     selected_label = st.selectbox("Selecciona el documento", options=list(book_options.keys()))
     selected_book_id = book_options[selected_label]
 
+
+    st.markdown("<hr>", unsafe_allow_html=True)
+
+#-------------buscador de palabras-----------------------------------------------
+    query = st.text_input("Palabra o frase a buscar")
+
+    if query:
+        st.session_state.last_query = query
+
+        results = search_pages(query, selected_book_id)
+
+        if not results:
+            st.warning("No se encontraron resultados para tu búsqueda.")
+        else:
+            st.success(f"{len(results)} resultado(s) encontrado(s)")
+
+            for r in results:
+                contexto = extraer_contexto(r["text"], query)
+                highlighted = highlight_extra(contexto, query)
+
+                col1, col2 = st.columns([5, 1])
+
+                with col1:
+                    st.markdown(
+                        f"<b>📄 {r['book_id']} — Página {r['page']}</b>",
+                        unsafe_allow_html=True
+                    )
+                    breadcrumb_html = render_breadcrumbs(r.get("structure"))
+                    if breadcrumb_html:
+                        st.markdown(breadcrumb_html, unsafe_allow_html=True)
+                    st.markdown(highlighted, unsafe_allow_html=True)
+
+                with col2:
+                    if st.button("Ver página", key=f"{r['book_id']}_{r['page']}"):
+                        st.session_state.selected_page = r["page"]
+                        st.session_state.selected_book_id = r["book_id"]
+                        st.rerun()
+
+                st.markdown("<hr>", unsafe_allow_html=True)
     # ── Buscador por número de página ──
     page_col1, page_col2 = st.columns([3, 1])
     with page_col1:
@@ -282,41 +321,3 @@ else:
                         st.session_state.selected_book_id = b
                         st.session_state.last_query = ""
                         st.rerun()
-
-    st.markdown("<hr>", unsafe_allow_html=True)
-
-    query = st.text_input("Palabra o frase a buscar")
-
-    if query:
-        st.session_state.last_query = query
-
-        results = search_pages(query, selected_book_id)
-
-        if not results:
-            st.warning("No se encontraron resultados para tu búsqueda.")
-        else:
-            st.success(f"{len(results)} resultado(s) encontrado(s)")
-
-            for r in results:
-                contexto = extraer_contexto(r["text"], query)
-                highlighted = highlight_extra(contexto, query)
-
-                col1, col2 = st.columns([5, 1])
-
-                with col1:
-                    st.markdown(
-                        f"<b>📄 {r['book_id']} — Página {r['page']}</b>",
-                        unsafe_allow_html=True
-                    )
-                    breadcrumb_html = render_breadcrumbs(r.get("structure"))
-                    if breadcrumb_html:
-                        st.markdown(breadcrumb_html, unsafe_allow_html=True)
-                    st.markdown(highlighted, unsafe_allow_html=True)
-
-                with col2:
-                    if st.button("Ver página", key=f"{r['book_id']}_{r['page']}"):
-                        st.session_state.selected_page = r["page"]
-                        st.session_state.selected_book_id = r["book_id"]
-                        st.rerun()
-
-                st.markdown("<hr>", unsafe_allow_html=True)
